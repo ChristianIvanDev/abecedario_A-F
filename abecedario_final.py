@@ -1,5 +1,6 @@
 import cv2
 import mediapipe as mp
+import numpy as np
 
 def distancia_euclidiana(p1, p2):
     d = ((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2) ** 0.5
@@ -25,6 +26,10 @@ def draw_bounding_box(image, hand_landmarks):
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
+
+# Load static images with transparency
+image1 = cv2.imread('C:\\Users\\Usuario\\Documents\\GitHub\\abecedario_A-F\\Algo.png', cv2.IMREAD_UNCHANGED)
+image2 = cv2.imread('C:\\Users\\Usuario\\Documents\\GitHub\\abecedario_A-F\\Iselac.png', cv2.IMREAD_UNCHANGED)
 
 cap = cv2.VideoCapture(0)
 cap.set(3,1920)
@@ -146,6 +151,42 @@ with mp_hands.Hands(
                 print("pulgar", thumb_tip[1])
                 print("dedo indice",index_finger_tip[1])
                 
+    # Resize images to be wider
+    image1_resized = cv2.resize(image1, (300, 200))
+    image2_resized = cv2.resize(image2, (300, 200))
+
+    # Overlay images on the camera feed
+    def overlay_image_alpha(img, img_overlay, x, y, alpha_mask):
+        """Overlay `img_overlay` onto `img` at (x, y) and blend using `alpha_mask`.
+
+        `alpha_mask` must have same HxW as `img_overlay` and values between 0 and 1.
+        """
+        # Image ranges
+        y1, y2 = max(0, y), min(img.shape[0], y + img_overlay.shape[0])
+        x1, x2 = max(0, x), min(img.shape[1], x + img_overlay.shape[1])
+
+        # Overlay ranges
+        y1o, y2o = max(0, -y), min(img_overlay.shape[0], img.shape[0] - y)
+        x1o, x2o = max(0, -x), min(img_overlay.shape[1], img.shape[1] - x)
+
+        # Exit if nothing to do
+        if y1 >= y2 or x1 >= x2 or y1o >= y2o or x1o >= x2o:
+            return
+
+        # Blend overlay within the determined ranges
+        img_crop = img[y1:y2, x1:x2]
+        img_overlay_crop = img_overlay[y1o:y2o, x1o:x2o]
+        alpha = alpha_mask[y1o:y2o, x1o:x2o, np.newaxis]
+        img_crop[:] = alpha * img_overlay_crop + (1 - alpha) * img_crop
+
+    # Extract the alpha mask of the RGBA images
+    alpha_s1 = image1_resized[:, :, 3] / 255.0
+    alpha_s2 = image2_resized[:, :, 3] / 255.0
+
+    # Overlay the images on the left and right sides
+    overlay_image_alpha(image, image1_resized[:, :, :3], 50, 50, alpha_s1)
+    overlay_image_alpha(image, image2_resized[:, :, :3], image_width - 350, 50, alpha_s2)
+
     cv2.imshow('MediaPipe Hands', image)
     if cv2.waitKey(5) & 0xFF == 27:
       break
